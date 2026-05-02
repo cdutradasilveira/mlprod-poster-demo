@@ -128,6 +128,36 @@ no `OMP_NUM_THREADS=1` workarounds taint MLP latency.
 
 ---
 
+## Demo simplifications
+
+This is a teaching demo, not a production replica of Booking's RS. Three
+deliberate simplifications are worth calling out so the audience understands
+where the demo diverges from the paper:
+
+1. **GLM is served in-process.** GLM serving in this demo runs as a numpy
+   inner product directly inside the FastAPI worker (~2.5 µs per predict).
+   In Booking's real RS — and in any production deployment of a GLM —
+   the model would be served by a dedicated process behind the same
+   network layer as Lookup. With both methods paying network cost, Lookup's
+   latency advantage (the strength the paper highlights for it) reappears.
+   In the demo, Lookup pays a TCP round-trip to Redis (~47 µs floor) while
+   GLM does not, which inverts the apparent ordering. The Tab 1 "Serving"
+   panel surfaces this asymmetry in a callout when Lookup or GLM is selected.
+
+2. **Lookup table covers a subset of the input space.** `populate_lookup.py`
+   precomputes 1000 users × 500 hotels = 500k entries per model (2M total
+   across the four models). Users with `id ≥ 1000` are intentionally left
+   out so the demo can showcase **lookup misses**. In production at Booking
+   scale the lookup would cover the full user × accommodation catalog.
+
+3. **Single Redis instance, no replication.** The `docker-compose.yml`
+   provisions one `redis:7-alpine` container with a local volume. There is
+   no replication, no Redis Cluster, no failover. The paper's "Lookup
+   Tables" method assumes a horizontally-scaled key-value store (Cassandra
+   in Booking's case); we simplify to make `docker compose up` instant.
+
+---
+
 ## Demo script (~5 minutes live)
 
 The UI is built around this exact flow:

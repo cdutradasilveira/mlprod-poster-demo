@@ -13,12 +13,14 @@ export function LookupGlmExplainer({ method }: Props) {
       <Info className="mt-[1px] h-3.5 w-3.5 shrink-0" />
       <span>
         <span className="font-medium text-foreground">
-          Lookup and GLM offer comparable latency.
+          Why GLM looks faster than Lookup here.
         </span>{" "}
-        The real distinction is in flexibility: Lookup serves any model but
-        cannot handle continuous inputs; GLM handles continuous inputs but only
-        linear models. The paper places both at the origin of the
-        flexibility / robustness plane (Bernardi 2019, §4).
+        In this demo, GLM runs in-process while Lookup queries Redis over TCP
+        (~47 µs network floor). The paper's latency advantage of Lookup over
+        GLM holds when both methods are served behind the same network layer
+        — a simplification we don't replicate here. The radar's static axes
+        (Modeling, Input Space, Stack, Consistency, Observability) reflect the
+        paper faithfully.
       </span>
     </div>
   );
