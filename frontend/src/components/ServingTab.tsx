@@ -7,6 +7,7 @@ import { LatencyHistogram } from "@/components/LatencyHistogram";
 import { LookupGlmExplainer } from "@/components/LookupGlmExplainer";
 import { MethodFlow } from "@/components/MethodFlow";
 import { MethodRadarChart } from "@/components/RadarChart";
+import { ScriptedInfoDialog } from "@/components/ScriptedInfoDialog";
 import {
   StressHistory,
   type StressHistoryEntry,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { api, ApiError } from "@/lib/api";
+import { MODEL_COLORS } from "@/lib/theme";
 import type {
   CompatibilityResponse,
   MethodId,
@@ -120,6 +122,13 @@ export function ServingTab({ resetGen }: Props) {
   } | null>(null);
   const stressEsRef = useRef<EventSource | null>(null);
 
+  // Scripted always wraps the PyTorch MLP regardless of the model column
+  // (CLAUDE.md §7.4). The UI uses `effectiveModel` for everything that should
+  // reflect what actually runs (feature display, predict request body), and
+  // disables the model selector while Scripted is active.
+  const scriptedActive = method === "scripted";
+  const effectiveModel: ModelId = scriptedActive ? "mlp" : model;
+
   const isCompatible = useMemo(() => {
     if (!compat) return true;
     const m = compat.models.indexOf(model);
@@ -135,7 +144,7 @@ export function ServingTab({ resetGen }: Props) {
     return compat.matrix[m]?.[me]?.reason ?? null;
   }, [compat, isCompatible, model, method]);
 
-  const currentMetrics = combosMetrics[comboKey(model, method)] ?? emptyMetrics();
+  const currentMetrics = combosMetrics[comboKey(effectiveModel, method)] ?? emptyMetrics();
   const p95 = percentile(currentMetrics.latencies, 95);
 
   const selectedUser = useMemo(
@@ -219,7 +228,7 @@ export function ServingTab({ resetGen }: Props) {
     setPredicting(true);
     try {
       const res = await api.predict({
-        model,
+        model: effectiveModel,
         method,
         user_id: userId,
         hotel_id: hotelId,
@@ -228,15 +237,15 @@ export function ServingTab({ resetGen }: Props) {
       const hits = res.outcome === "hit" ? 1 : 0;
       const misses = res.outcome === "miss" ? 1 : 0;
       const errors = res.outcome === "error" ? 1 : 0;
-      recordPrediction(model, method, [res.latency_ms], hits, misses, errors);
+      recordPrediction(effectiveModel, method, [res.latency_ms], hits, misses, errors);
     } catch (e) {
       const err = e as ApiError;
       setPredictError(err.message);
-      recordPrediction(model, method, [], 0, 0, 1);
+      recordPrediction(effectiveModel, method, [], 0, 0, 1);
     } finally {
       setPredicting(false);
     }
-  }, [model, method, userId, hotelId, isCompatible, recordPrediction]);
+  }, [effectiveModel, method, userId, hotelId, isCompatible, recordPrediction]);
 
   // ---- Random / force miss helpers ----
   const handleRandom = useCallback(() => {
@@ -260,7 +269,7 @@ export function ServingTab({ resetGen }: Props) {
     if (!isCompatible) return;
     setStressProgress({ processed: 0, total: stressN });
     const url = api.stressTestStreamUrl({
-      model,
+      model: effectiveModel,
       method,
       n_requests: stressN,
       sample_strategy: "uniform",
@@ -283,7 +292,7 @@ export function ServingTab({ resetGen }: Props) {
       lastHits = data.hits;
       lastMisses = data.misses;
       lastErrors = data.errors;
-      recordPrediction(model, method, data.latencies_ms, dh, dm, de);
+      recordPrediction(effectiveModel, method, data.latencies_ms, dh, dm, de);
       setStressProgress({ processed: data.processed, total: data.total });
     });
 
@@ -316,7 +325,7 @@ export function ServingTab({ resetGen }: Props) {
       stressEsRef.current = null;
       setStressProgress(null);
     });
-  }, [isCompatible, model, method, stressN, recordPrediction]);
+  }, [isCompatible, effectiveModel, method, stressN, recordPrediction]);
 
   // ---- Render ----
   if (bootstrapError) {
@@ -356,12 +365,31 @@ export function ServingTab({ resetGen }: Props) {
             <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Model
             </label>
-            <SegmentedControl
-              value={model}
-              onChange={setModel}
-              options={MODEL_OPTIONS}
-              ariaLabel="Model"
-            />
+            {scriptedActive ? (
+              <div
+                role="status"
+                aria-label="Model is fixed to MLP because the Scripted method always wraps the PyTorch MLP (paper §3.4)"
+                className="inline-flex h-9 min-w-[230px] items-center gap-2 rounded-lg border border-input bg-muted/50 px-3 pr-1.5"
+              >
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: MODEL_COLORS.mlp }}
+                  aria-hidden
+                />
+                <span className="text-xs font-medium text-foreground">MLP</span>
+                <span className="text-[11px] text-muted-foreground">
+                  fixed by Scripted (§3.4)
+                </span>
+                <ScriptedInfoDialog />
+              </div>
+            ) : (
+              <SegmentedControl
+                value={model}
+                onChange={setModel}
+                options={MODEL_OPTIONS}
+                ariaLabel="Model"
+              />
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -461,7 +489,7 @@ export function ServingTab({ resetGen }: Props) {
               </Button>
             </div>
 
-            <MethodFlow model={model} method={method} />
+            <MethodFlow model={effectiveModel} method={method} />
 
             <LookupGlmExplainer method={method} />
 
@@ -521,7 +549,7 @@ export function ServingTab({ resetGen }: Props) {
           <CardHeader>
             <CardTitle className="text-sm">Live metrics</CardTitle>
             <CardDescription className="text-xs">
-              {model.toUpperCase()} × {method.toUpperCase()} — latencies and counters
+              {effectiveModel.toUpperCase()} × {method.toUpperCase()} — latencies and counters
               for this combo.
             </CardDescription>
           </CardHeader>

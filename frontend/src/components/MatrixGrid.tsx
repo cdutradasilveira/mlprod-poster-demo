@@ -37,7 +37,9 @@ export function MatrixGrid({ compat, snapshots }: Props) {
   const cell = (model: ModelId, method: MethodId, mi: number, hi: number) => {
     const cell = compat.matrix[mi]?.[hi];
     if (!cell) return null;
-    const snapshot = snapshots[`${model}:${method}`];
+    // Scripted snapshots all live under the (mlp, scripted) key — see HoverDetails note.
+    const snapKey = method === "scripted" ? `mlp:scripted` : `${model}:${method}`;
+    const snapshot = snapshots[snapKey];
     return (
       <button
         key={method}
@@ -132,7 +134,11 @@ function HoverDetails({
   const mi = compat.models.indexOf(model);
   const hi = compat.methods.indexOf(method);
   const cell = compat.matrix[mi]?.[hi];
-  const snap = snapshots[`${model}:${method}`];
+  // The Scripted method always wraps the MLP regardless of the model column
+  // (CLAUDE.md §7.4). The actual traffic snapshot lives under the (mlp, scripted)
+  // key — fetch it from there for any model row when method=scripted.
+  const snapKey = method === "scripted" ? `mlp:scripted` : `${model}:${method}`;
+  const snap = snapshots[snapKey];
   if (!cell) return null;
 
   if (!cell.compatible) {
@@ -151,6 +157,13 @@ function HoverDetails({
       <div className="font-semibold">
         {MODEL_DISPLAY[model]} × {method.toUpperCase()}
       </div>
+      {method === "scripted" && (
+        <div className="text-muted-foreground leading-snug">
+          Compatible — Scripted always wraps the PyTorch MLP regardless of the
+          model selected, applying business rules on top. The model column has
+          no effect on this column. (Paper §3.4)
+        </div>
+      )}
       {snap && snap.p95_ms !== null ? (
         <div className="flex flex-wrap gap-x-4 font-mono text-[11px] text-muted-foreground">
           <span>total {snap.total_requests}</span>
