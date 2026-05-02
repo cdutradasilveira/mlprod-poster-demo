@@ -63,7 +63,16 @@ def compare(req: CompareRequest) -> CompareResponse:
     aucs = _load_aucs()
     rows: list[CompareRow] = []
     t0 = time.perf_counter()
+    # Scripted always wraps the MLP (CLAUDE.md §7.4), so all four (model, scripted)
+    # cells would produce the same latency distribution and the same AUC. Emit only
+    # one Scripted row, attributed to MLP.
+    seen_scripted = False
     for model, method in valid_combinations():
+        if method == "scripted":
+            if seen_scripted:
+                continue
+            seen_scripted = True
+            model = "mlp"
         latencies, hits, misses, errors = _run_stress(
             model, method, req.n_requests_per_combo, req.sample_strategy  # type: ignore[arg-type]
         )

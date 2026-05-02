@@ -19,7 +19,7 @@ from app.serving.scripted import ScriptedServer
 logger = logging.getLogger("ml-prod-demo.factory")
 
 
-def _build(model: str, method: str) -> Server:
+def _build(model: str, method: str, scripted_singleton: ScriptedServer | None = None) -> Server:
     if method == "lookup":
         return LookupServer(model)
     if method == "glm":
@@ -27,19 +27,31 @@ def _build(model: str, method: str) -> Server:
     if method == "native":
         return NativeServer(model)
     if method == "scripted":
-        return ScriptedServer(model)
+        # All four (model, scripted) cells share the same instance because Scripted
+        # always wraps the MLP regardless of the model column (CLAUDE.md §7.4).
+        return scripted_singleton or ScriptedServer()
     raise ValueError(f"Unknown method: {method!r}")
 
 
 class ServerFactory:
     def __init__(self) -> None:
         self._servers: dict[tuple[str, str], Server] = {}
+        self._scripted_singleton: ScriptedServer | None = None
 
     def warm(self) -> None:
         """Load every valid (model, method) server once."""
+        # Build the Scripted singleton first so all (model, scripted) entries reuse it.
+        try:
+            self._scripted_singleton = ScriptedServer()
+            logger.info("Warmed server: scripted (singleton, always MLP)")
+        except Exception:
+            logger.exception("Failed to warm Scripted singleton")
+            raise
         for model, method in valid_combinations():
             try:
-                self._servers[(model, method)] = _build(model, method)
+                self._servers[(model, method)] = _build(
+                    model, method, scripted_singleton=self._scripted_singleton
+                )
                 logger.info("Warmed server: model=%s method=%s", model, method)
             except Exception:
                 logger.exception("Failed to warm model=%s method=%s", model, method)
@@ -51,7 +63,9 @@ class ServerFactory:
             raise ValueError(reason or f"Invalid combination: {model}×{method}")
         if (model, method) not in self._servers:
             # Lazy fallback (also useful for tests that skip warm()).
-            self._servers[(model, method)] = _build(model, method)
+            self._servers[(model, method)] = _build(
+                model, method, scripted_singleton=self._scripted_singleton
+            )
         return self._servers[(model, method)]
 
     def loaded_combinations(self) -> Iterable[tuple[str, str]]:
