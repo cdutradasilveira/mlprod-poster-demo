@@ -11,12 +11,16 @@ Expected total time: a few seconds per model (tens of seconds total for all four
 """
 from __future__ import annotations
 
+import struct
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import redis
+
+# Match the binary unpacker in app/serving/lookup.py — 8-byte little-endian double.
+_PACK = struct.Struct("<d")
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -90,12 +94,13 @@ def main() -> None:
             probs[start:end] = server.predict_proba_batch(X[start:end])
         pred_dt = time.perf_counter() - pred_t0
 
-        # Pipelined MSET in WRITE_CHUNK groups.
+        # Pipelined MSET in WRITE_CHUNK groups. Values stored as raw 8-byte doubles
+        # to match the binary unpacker in LookupServer (saves ~5-10us per GET).
         write_t0 = time.perf_counter()
         for start in range(0, len(probs), WRITE_CHUNK):
             end = min(start + WRITE_CHUNK, len(probs))
             mapping = {
-                lookup_key(model_name, int(uids[i]), int(hids[i])): f"{probs[i]:.6f}"
+                lookup_key(model_name, int(uids[i]), int(hids[i])): _PACK.pack(probs[i])
                 for i in range(start, end)
             }
             r.mset(mapping)
