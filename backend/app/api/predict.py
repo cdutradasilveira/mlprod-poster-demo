@@ -77,6 +77,17 @@ def predict(req: PredictRequest) -> PredictResponse:
     else:
         outcome = "hit"
 
+    # The Scripted method always wraps the PyTorch MLP regardless of the model the
+    # caller selected (CLAUDE.md §7.4). Annotate the response so API consumers don't
+    # think the `model` parameter actually drove this prediction.
+    metadata = dict(result.metadata)
+    if req.method == "scripted" and req.model != "mlp":
+        metadata["note"] = (
+            "The 'model' parameter was ignored. Scripted always uses the "
+            "PyTorch MLP per paper §3.4."
+        )
+        metadata["effective_model"] = "mlp"
+
     get_metrics().record(req.model, req.method, result.latency_ms, outcome=outcome)
 
     prob_str = f"{result.probability:.4f}" if result.probability is not None else "miss"
@@ -93,6 +104,6 @@ def predict(req: PredictRequest) -> PredictResponse:
         hotel_id=req.hotel_id,
         probability=result.probability,
         latency_ms=result.latency_ms,
-        method_metadata=result.metadata,
+        method_metadata=metadata,
         outcome=outcome,
     )

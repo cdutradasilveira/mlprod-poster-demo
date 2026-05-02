@@ -1,4 +1,11 @@
-"""Scripted serving: wraps the native MLP and applies three business rules on top.
+"""Scripted serving: wraps the PyTorch MLP and applies three business rules on top.
+
+Per CLAUDE.md §7.4 and paper §3.4, the Scripted method always wraps the MLP — chosen
+because it's the most "exotic" model and fits the paper's "unsupported libraries"
+framing. The `model` parameter at the API layer is accepted but **ignored** for this
+method (the API response surfaces this in `metadata.note`). The compatibility matrix
+in §2 keeps all four (model × scripted) cells green to indicate the request still
+succeeds; the UI disables the model selector when Scripted is active.
 
 Rules (applied in order, each appended to metadata.applied_rules):
   1. Cold-start blend: if user has 0 historical bookings, blend with global popularity.
@@ -52,14 +59,11 @@ COLD_START_BLEND = 0.7  # weight on popularity prior when user is cold
 
 class ScriptedServer(Server):
     method_name = "scripted"
-    # The compatibility matrix (CLAUDE.md §2) marks Scripted as valid for all four
-    # models. The canonical example in §7.4 uses the MLP, but the same wrapping
-    # (cold-start blend + diversity penalty + clip) applies cleanly on top of any
-    # NativeServer.
+    # Always MLP, regardless of the model the caller selected. See module docstring.
+    model_name = "mlp"
 
-    def __init__(self, model_name: str = "mlp") -> None:
-        self.model_name = model_name
-        self._native = NativeServer(model_name)
+    def __init__(self) -> None:
+        self._native = NativeServer("mlp")
         self._store = get_store()
         self._popularity = self._compute_popularity()
 
