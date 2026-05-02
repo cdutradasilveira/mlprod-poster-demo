@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import struct
 import time
 from typing import Iterator
 
 import redis
+
+# Each value in Redis is 8 raw bytes: little-endian IEEE-754 double.
+# Saves the cost of bytes→str→float on every GET (~5-10us in Python).
+_PACK = struct.Struct("<d")
 
 from app.config import settings
 from app.serving.base import PredictionResult, RadarAxes, Server
@@ -24,14 +29,35 @@ def lookup_key(model_name: str, user_id: int, hotel_id: int) -> str:
     return f"{KEY_PREFIX}:{model_name}:{user_id}:{hotel_id}"
 
 
+_shared_client: redis.Redis | None = None
+
+
+def get_redis_client() -> redis.Redis:
+    """Single Redis client reused across all LookupServer instances.
+
+    `socket_keepalive=True` keeps the TCP connection open across idle periods,
+    avoiding the kernel's silent connection drop and the resulting reconnect cost
+    on the next GET. `decode_responses=False` keeps responses as bytes — we either
+    decode strings ourselves or unpack binary floats (see Paso 2d).
+    """
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = redis.Redis.from_url(
+            settings.redis_url,
+            decode_responses=False,
+            socket_keepalive=True,
+            socket_connect_timeout=2,
+            health_check_interval=30,
+        )
+    return _shared_client
+
+
 class LookupServer(Server):
     method_name = "lookup"
 
-    def __init__(self, model_name: str, redis_url: str | None = None) -> None:
+    def __init__(self, model_name: str, redis_client: redis.Redis | None = None) -> None:
         self.model_name = model_name
-        self._redis: redis.Redis = redis.Redis.from_url(
-            redis_url or settings.redis_url, decode_responses=True
-        )
+        self._redis: redis.Redis = redis_client or get_redis_client()
 
     def predict(self, user_id: int, hotel_id: int) -> PredictionResult:
         key = lookup_key(self.model_name, user_id, hotel_id)
@@ -45,7 +71,7 @@ class LookupServer(Server):
                 metadata={"cache_hit": False, "key": key},
             )
         return PredictionResult(
-            probability=float(raw),
+            probability=_PACK.unpack(raw)[0],
             latency_ms=latency_ms,
             metadata={"cache_hit": True, "key": key},
         )
@@ -75,7 +101,7 @@ class LookupServer(Server):
                 break
         return count
 
-    def _scan_keys(self) -> Iterator[str]:
+    def _scan_keys(self) -> Iterator[bytes]:
         return self._redis.scan_iter(
             match=f"{KEY_PREFIX}:{self.model_name}:*", count=1000
         )
