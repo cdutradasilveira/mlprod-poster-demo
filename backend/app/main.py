@@ -31,7 +31,6 @@ logger = logging.getLogger("ml-prod-demo")
 async def lifespan(app: FastAPI):
     logger.info("Backend starting (log_level=%s)", settings.log_level)
     logger.info("Artifacts dir: %s", settings.artifacts_dir)
-    logger.info("Redis URL: %s", settings.redis_url)
     logger.info("CORS origins: %s", settings.cors_origins)
     # Warm caches: load feature store, build all valid (model, method) servers.
     try:

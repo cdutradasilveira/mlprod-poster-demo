@@ -1,18 +1,4 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: ml-prod-demo-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   backend:
     build:
       context: ./backend
@@ -21,7 +7,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      REDIS_URL: redis://redis:6379/0
       ARTIFACTS_DIR: /app/artifacts
       LOG_LEVEL: INFO
       CORS_ORIGINS: "http://localhost:5173,http://localhost:5174,http://localhost:5175"
@@ -29,10 +14,4 @@ services:
       - ./backend/artifacts:/app/artifacts
       - ./backend/app:/app/app
       - ./backend/scripts:/app/scripts
-    depends_on:
-      redis:
-        condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  redis-data:

@@ -21,8 +21,9 @@ METHOD_DISPLAY: dict[str, dict[str, str]] = {
     "lookup": {
         "display_name": "Lookup Table",
         "description": (
-            "Precomputed predictions stored in Redis. Sub-millisecond reads, but "
-            "limited to enumerable input spaces (paper §3.1)."
+            "Precomputed predictions stored in an in-process numpy array. "
+            "Lowest possible latency — pure Python dict lookup, no network hop. "
+            "Limited to enumerable input spaces (paper §3.1)."
         ),
     },
     "glm": {

@@ -54,10 +54,10 @@ everything in containers because xgboost + torch coexist cleanly on Linux but
 clash on macOS ARM).
 
 ```bash
-# 1. Bring up Redis + backend
-docker compose up -d redis backend
+# 1. Bring up backend
+docker compose up -d backend
 
-# 2. Generate the synthetic dataset, train the four models, populate Redis
+# 2. Generate the synthetic dataset, train the four models
 docker compose exec backend python scripts/generate_data.py
 docker compose exec backend python scripts/train_all.py
 docker compose exec backend python scripts/populate_lookup.py

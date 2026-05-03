@@ -16,7 +16,6 @@ def _parse_origins(raw: str) -> list[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    redis_url: str
     artifacts_dir: Path
     log_level: str
     cors_origins: list[str]
@@ -24,7 +23,6 @@ class Settings:
 
 def load_settings() -> Settings:
     return Settings(
-        redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
         artifacts_dir=Path(os.getenv("ARTIFACTS_DIR", str(_default_artifacts_dir()))),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         cors_origins=_parse_origins(

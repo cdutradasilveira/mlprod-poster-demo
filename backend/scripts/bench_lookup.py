@@ -1,7 +1,7 @@
 """Micro-benchmark for the LookupServer.
 
-Runs N back-to-back GETs against Redis through the production LookupServer code
-(no batching, no pipelining — same path the API takes for a single /api/predict).
+Runs N back-to-back lookups through the production LookupServer code
+(no batching — same path the API takes for a single /api/predict).
 Reports p50/p95/p99 in microseconds and milliseconds.
 """
 from __future__ import annotations
