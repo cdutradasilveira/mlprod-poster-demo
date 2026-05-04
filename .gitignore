@@ -16,9 +16,11 @@ env/
 backend/artifacts/models/*
 backend/artifacts/data/*
 backend/artifacts/metrics/*
+backend/artifacts/lookup/*
 !backend/artifacts/models/.gitkeep
 !backend/artifacts/data/.gitkeep
 !backend/artifacts/metrics/.gitkeep
+!backend/artifacts/lookup/.gitkeep
 
 # Node / frontend
 node_modules/

@@ -11,14 +11,14 @@ const ARTIFACT_BY_MODEL: Record<ModelId, string> = {
 };
 
 const METHOD_NODE: Record<MethodId, { label: string; icon: typeof Box }> = {
-  lookup: { label: "Redis lookup", icon: Database },
+  lookup: { label: "in-process numpy table", icon: Database },
   glm: { label: "numpy · σ(W·x + b)", icon: FileJson },
   native: { label: "library predict()", icon: Box },
   scripted: { label: "script + rules", icon: Code2 },
 };
 
 const ARTIFACT_BY_METHOD: Record<MethodId, ((m: ModelId) => string) | null> = {
-  lookup: () => "pred:{model}:{user}:{hotel}",
+  lookup: (m) => `lookup/${m}.npy[user, hotel]`,
   glm: () => "glm_weights.json",
   native: (m) => ARTIFACT_BY_MODEL[m],
   scripted: (m) => `scripted.py + ${ARTIFACT_BY_MODEL[m]}`,
