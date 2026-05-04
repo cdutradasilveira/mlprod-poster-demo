@@ -6,16 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from app.config import settings
-from app.serving.base import PredictionResult, RadarAxes, Server
-
-# Static axes for Lookup, per CLAUDE.md §8.
-STATIC_AXES = RadarAxes(
-    modeling_flexibility=1.0,
-    input_space_flexibility=-1.0,
-    stack_flexibility=1.0,
-    consistency=0.0,
-    observability=1.0,
-)
+from app.serving.base import PredictionResult, Server
 
 LOOKUP_SUBDIR = "lookup"
 
@@ -79,10 +70,6 @@ class LookupServer(Server):
     def artifact_size_bytes(self) -> int:
         p = _lookup_path(self.model_name)
         return p.stat().st_size if p.exists() else 0
-
-    @property
-    def static_axes(self) -> RadarAxes:
-        return STATIC_AXES
 
     def is_populated(self) -> bool:
         return self.model_name in get_lookup_tables()

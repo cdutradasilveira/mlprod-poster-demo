@@ -13,16 +13,7 @@ import numpy as np
 
 from app.config import settings
 from app.models_io.registry import get_store
-from app.serving.base import PredictionResult, RadarAxes, Server
-
-# Static axes for GLM, per CLAUDE.md §8.
-STATIC_AXES = RadarAxes(
-    modeling_flexibility=-1.0,
-    input_space_flexibility=1.0,
-    stack_flexibility=1.0,
-    consistency=-1.0,
-    observability=1.0,
-)
+from app.serving.base import PredictionResult, Server
 
 
 class GLMServer(Server):
@@ -62,7 +53,3 @@ class GLMServer(Server):
 
     def artifact_size_bytes(self) -> int:
         return self._path.stat().st_size
-
-    @property
-    def static_axes(self) -> RadarAxes:
-        return STATIC_AXES

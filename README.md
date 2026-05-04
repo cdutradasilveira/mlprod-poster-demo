@@ -160,9 +160,10 @@ where the demo diverges from the paper:
    (Cassandra in Booking's case); collapsing to an in-process numpy array
    trades the paper's scalability and persistence properties for a much
    simpler stack and the tightest possible latency. The radar's static
-   axes still reflect what the paper says about Lookup conceptually
-   (high Modeling flexibility, low Input Space flexibility, high Stack
-   flexibility, etc.) — only the deployment shape is simplified.
+   axes (defined in `frontend/src/components/RadarChart.tsx`) reflect the
+   paper's framing of each method along Modeling / Input Space / Stack /
+   Consistency / Observability — independent of how the demo collapsed
+   the deployment.
 
 ---
 

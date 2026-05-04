@@ -580,7 +580,7 @@ export function ServingTab({ resetGen }: Props) {
                   <Badge variant="outline">p95 {fmtMs(p95)}</Badge>
                 )}
               </div>
-              <MethodRadarChart method={method} p95Ms={p95} />
+              <MethodRadarChart method={method} />
             </div>
           </CardContent>
         </Card>

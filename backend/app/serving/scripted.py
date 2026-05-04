@@ -25,17 +25,8 @@ import pandas as pd
 
 from app.config import settings
 from app.models_io.registry import get_store
-from app.serving.base import PredictionResult, RadarAxes, Server
+from app.serving.base import PredictionResult, Server
 from app.serving.native import NativeServer
-
-# Static axes for Scripted, per CLAUDE.md §8.
-STATIC_AXES = RadarAxes(
-    modeling_flexibility=1.0,
-    input_space_flexibility=1.0,
-    stack_flexibility=-1.0,
-    consistency=0.0,
-    observability=-1.0,
-)
 
 # Broad continent grouping used for the diversity penalty. Cities outside the user's
 # group are considered "distant" and incur a 0.85× multiplier.
@@ -116,7 +107,3 @@ class ScriptedServer(Server):
         script_path = getsourcefile(type(self))
         script_size = os.path.getsize(script_path) if script_path else 0
         return script_size + self._native.artifact_size_bytes()
-
-    @property
-    def static_axes(self) -> RadarAxes:
-        return STATIC_AXES

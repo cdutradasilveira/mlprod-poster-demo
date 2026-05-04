@@ -83,23 +83,52 @@ export default function App() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <TabsContent value="serving">
+          {/* forceMount keeps every tab mounted across switches so each tab's
+              local state (predictions, history, comparison results) survives.
+              The data-state="inactive" → hidden CSS pattern hides them
+              visually without unmounting. */}
+          <TabsContent
+            value="serving"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
             <ServingTab resetGen={resetGen} />
           </TabsContent>
-          <TabsContent value="quality">
+          <TabsContent
+            value="quality"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
             <QualityTab />
           </TabsContent>
-          <TabsContent value="comparison">
-            <ComparisonTab />
+          <TabsContent
+            value="comparison"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <ComparisonTab resetGen={resetGen} />
           </TabsContent>
-          <TabsContent value="matrix">
-            <MatrixTab />
+          <TabsContent
+            value="matrix"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <MatrixTab resetGen={resetGen} isActive={activeTab === "matrix"} />
           </TabsContent>
         </Tabs>
       </main>
 
       <footer className="border-t py-3 text-center text-xs text-muted-foreground">
-        Skeleton ready — Tabs will be filled in Phases 5-7.
+        Booking.com — Bernardi (2019). Built for the Master's in AI class at
+        ORT. Source:{" "}
+        <a
+          href="https://github.com/cdutradasilveira/mlprod-poster-demo"
+          target="_blank"
+          rel="noreferrer"
+          className="underline hover:text-foreground"
+        >
+          github.com/cdutradasilveira/mlprod-poster-demo
+        </a>
       </footer>
     </div>
   );

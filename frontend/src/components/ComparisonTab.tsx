@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Loader2, Play, RotateCw } from "lucide-react";
 
 import { CompareLegend, CompareScatter } from "@/components/CompareScatter";
@@ -17,7 +17,11 @@ import { cn } from "@/lib/utils";
 
 const PRESETS = [200, 500, 1000];
 
-export function ComparisonTab() {
+interface Props {
+  resetGen: number;
+}
+
+export function ComparisonTab({ resetGen }: Props) {
   const [n, setN] = useState<number>(500);
   const [data, setData] = useState<CompareResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,12 +30,20 @@ export function ComparisonTab() {
   const run = useCallback(() => {
     setLoading(true);
     setError(null);
+    setData(null);  // hide previous run's scatter/table while the new one loads
     api
       .compare(n)
       .then(setData)
       .catch((e: ApiError) => setError(e.message))
       .finally(() => setLoading(false));
   }, [n]);
+
+  // Reset metrics from the header clears local Comparison state too.
+  useEffect(() => {
+    if (resetGen === 0) return;
+    setData(null);
+    setError(null);
+  }, [resetGen]);
 
   return (
     <div className="space-y-4">
@@ -105,8 +117,8 @@ export function ComparisonTab() {
         <Card>
           <CardContent className="flex h-48 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Running stress tests across {data?.rows.length ?? 13} valid
-            combinations… this takes a few seconds.
+            Running stress tests across all valid combinations… this takes
+            a few seconds.
           </CardContent>
         </Card>
       )}

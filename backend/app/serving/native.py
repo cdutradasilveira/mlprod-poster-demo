@@ -20,16 +20,8 @@ import xgboost as xgb
 
 from app.config import settings
 from app.models_io.registry import get_store
-from app.serving.base import PredictionResult, RadarAxes, Server
+from app.serving.base import PredictionResult, Server
 
-# Static axes for Native, per CLAUDE.md §8.
-STATIC_AXES = RadarAxes(
-    modeling_flexibility=1.0,
-    input_space_flexibility=1.0,
-    stack_flexibility=-1.0,
-    consistency=1.0,
-    observability=0.0,
-)
 MODELS_DIR = settings.artifacts_dir / "models"
 
 
@@ -130,10 +122,6 @@ class NativeServer(Server):
 
     def artifact_size_bytes(self) -> int:
         return self._artifact_path.stat().st_size
-
-    @property
-    def static_axes(self) -> RadarAxes:
-        return STATIC_AXES
 
     @property
     def kind(self) -> str:
