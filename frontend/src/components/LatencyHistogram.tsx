@@ -72,7 +72,7 @@ export function LatencyHistogram({ latencies, height = 160 }: Props) {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={bins} margin={{ top: 4, right: 8, left: -16, bottom: 4 }}>
+      <BarChart data={bins} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
         <CartesianGrid
           strokeDasharray="3 3"
           stroke="hsl(var(--border))"
@@ -91,7 +91,7 @@ export function LatencyHistogram({ latencies, height = 160 }: Props) {
           allowDecimals={false}
           tickLine={false}
           axisLine={false}
-          width={28}
+          width={40}
         />
         <Tooltip
           cursor={{ fill: "hsl(var(--muted) / 0.4)" }}

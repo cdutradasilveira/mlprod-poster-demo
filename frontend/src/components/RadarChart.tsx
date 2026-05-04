@@ -11,39 +11,46 @@ import {
 
 import type { MethodId } from "@/lib/types";
 
-// Static axes for each method (paper §4 + CLAUDE.md §8). Mirrors
-// backend/app/metrics/radar.py — kept in sync manually.
+// Static axes for each method (paper §4). Canonical source of truth — keep
+// CLAUDE.md §8 in sync if these values change.
+//
+// All six axes (including `latency`) are paper-sourced static scores; the
+// chart renders them as-is, with no live measurement mixed in.
 const STATIC_AXES: Record<
   MethodId,
-  Record<"modeling_flexibility" | "input_space_flexibility" | "stack_flexibility" | "consistency" | "observability", number>
+  Record<"modeling_flexibility" | "input_space_flexibility" | "stack_flexibility" | "consistency" | "observability" | "latency", number>
 > = {
   lookup: {
-    modeling_flexibility: 1,
+    modeling_flexibility: 0,
     input_space_flexibility: -1,
     stack_flexibility: 1,
     consistency: 0,
-    observability: 1,
+    observability: -1,
+    latency: 1,
   },
   glm: {
     modeling_flexibility: -1,
-    input_space_flexibility: 1,
+    input_space_flexibility: 0,
     stack_flexibility: 1,
     consistency: -1,
     observability: 1,
+    latency: 0,
   },
   native: {
-    modeling_flexibility: 1,
-    input_space_flexibility: 1,
+    modeling_flexibility: 0,
+    input_space_flexibility: 0,
     stack_flexibility: -1,
     consistency: 1,
     observability: 0,
+    latency: 0,
   },
   scripted: {
     modeling_flexibility: 1,
     input_space_flexibility: 1,
-    stack_flexibility: -1,
-    consistency: 0,
+    stack_flexibility: 0,
+    consistency: 1,
     observability: -1,
+    latency: -1,
   },
 };
 
@@ -56,36 +63,20 @@ const AXIS_LABELS: Record<string, string> = {
   latency: "Latency",
 };
 
-function latencyAxis(p95Ms: number | null): number | null {
-  if (p95Ms === null) return null;
-  if (p95Ms <= 2) return 1;
-  if (p95Ms <= 10) return 0;
-  return -1;
-}
-
 interface Props {
   method: MethodId;
-  p95Ms: number | null;
   height?: number;
 }
 
-export function MethodRadarChart({ method, p95Ms, height = 220 }: Props) {
-  const data = useMemo(() => {
-    const axes = STATIC_AXES[method];
-    const lat = latencyAxis(p95Ms);
-    return [
-      ...Object.entries(axes).map(([k, v]) => ({
+export function MethodRadarChart({ method, height = 220 }: Props) {
+  const data = useMemo(
+    () =>
+      Object.entries(STATIC_AXES[method]).map(([k, v]) => ({
         axis: AXIS_LABELS[k],
         value: v,
-        kind: "static",
       })),
-      {
-        axis: AXIS_LABELS.latency,
-        value: lat ?? 0,
-        kind: lat === null ? "no-data" : "dynamic",
-      },
-    ];
-  }, [method, p95Ms]);
+    [method],
+  );
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -114,11 +105,7 @@ export function MethodRadarChart({ method, p95Ms, height = 220 }: Props) {
             borderRadius: 6,
             fontSize: 11,
           }}
-          formatter={(value: number, _name: string, payload: { payload?: { kind?: string } } | undefined) => {
-            const kind = payload?.payload?.kind;
-            if (kind === "no-data") return ["not yet measured", "value"];
-            return [value, "score"];
-          }}
+          formatter={(value: number) => [value, "score"]}
         />
       </RechartsRadar>
     </ResponsiveContainer>

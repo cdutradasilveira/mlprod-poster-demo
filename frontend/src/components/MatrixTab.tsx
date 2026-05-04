@@ -59,7 +59,12 @@ const METHOD_BLOCKS: {
   },
 ];
 
-export function MatrixTab() {
+interface Props {
+  resetGen: number;
+  isActive: boolean;
+}
+
+export function MatrixTab({ resetGen, isActive }: Props) {
   const [compat, setCompat] = useState<CompatibilityResponse | null>(null);
   const [snapshots, setSnapshots] = useState<
     Record<string, {
@@ -75,17 +80,14 @@ export function MatrixTab() {
   >({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const refreshSnapshots = useCallback(() => {
-    setRefreshing(true);
     api
       .metrics()
       .then((m) => setSnapshots(m.snapshots))
       .catch(() => {
         // metrics failure is non-fatal — the matrix still renders
-      })
-      .finally(() => setRefreshing(false));
+      });
   }, []);
 
   const fetchAll = useCallback(() => {
@@ -103,6 +105,22 @@ export function MatrixTab() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Refetch snapshots when the user clicks "Reset metrics" in the header.
+  // Backend has cleared its accumulator; pulling now will return an empty map
+  // and the matrix will fall back to "no traffic" on every green cell.
+  useEffect(() => {
+    if (resetGen === 0) return;
+    refreshSnapshots();
+  }, [resetGen, refreshSnapshots]);
+
+  // Refetch snapshots when this tab becomes active. Because every tab is
+  // forceMount'ed, MatrixTab would otherwise display the snapshot taken at
+  // first mount even after the user generated traffic from Serving or
+  // Comparison. Refetching on activation keeps the matrix honest.
+  useEffect(() => {
+    if (isActive) refreshSnapshots();
+  }, [isActive, refreshSnapshots]);
 
   if (loading) {
     return (
@@ -138,30 +156,15 @@ export function MatrixTab() {
       <div className="lg:col-span-7">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-baseline justify-between gap-3">
-              <div>
-                <CardTitle className="text-sm">
-                  Compatibility matrix (4 × 4)
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Green cells are valid combinations; red cells carry the paper
-                  citation that explains why they don't work in this demo.
-                </CardDescription>
-              </div>
-              <Button
-                onClick={refreshSnapshots}
-                disabled={refreshing}
-                variant="outline"
-                size="sm"
-              >
-                {refreshing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Refresh latencies
-              </Button>
-            </div>
+            <CardTitle className="text-sm">
+              Compatibility matrix (4 × 4)
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Green cells are valid combinations; red cells carry the paper
+              citation that explains why they don't work in this demo.
+              Latencies refresh automatically when this tab is opened and when
+              "Reset metrics" is clicked.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <MatrixGrid compat={compat} snapshots={snapshots} />
