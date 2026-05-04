@@ -13,14 +13,16 @@ export function LookupGlmExplainer({ method }: Props) {
       <Info className="mt-[1px] h-3.5 w-3.5 shrink-0" />
       <span>
         <span className="font-medium text-foreground">
-          Why GLM looks faster than Lookup here.
+          Lookup and GLM both run in-process here.
         </span>{" "}
-        In this demo, GLM runs in-process while Lookup queries Redis over TCP
-        (~47 µs network floor). The paper's latency advantage of Lookup over
-        GLM holds when both methods are served behind the same network layer
-        — a simplification we don't replicate here. The radar's static axes
-        (Modeling, Input Space, Stack, Consistency, Observability) reflect the
-        paper faithfully.
+        Lookup reads from a process-local numpy array; GLM is a numpy inner
+        product. Booking's real RS would serve both behind a network layer
+        (Cassandra for Lookup, an in-house weight server for GLM); we
+        collapsed both to in-process to keep the stack to a single container.
+        The paper places both methods at the origin of the trade-off plane
+        and differentiates them by <em>flavor</em>: Lookup serves any model
+        but cannot handle continuous inputs; GLM handles continuous inputs
+        but only linear models (Bernardi 2019, §4).
       </span>
     </div>
   );

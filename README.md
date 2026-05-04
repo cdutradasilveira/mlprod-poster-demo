@@ -29,7 +29,7 @@ interface (`backend/app/serving/base.py`):
 
 | Method | How it serves | Stack at runtime |
 |---|---|---|
-| **Lookup** | `GET pred:{model}:{user}:{hotel}` from Redis | redis client only |
+| **Lookup** | `table[user_id, hotel_id]` from a process-local numpy array (`artifacts/lookup/{model}.npy`) | numpy only |
 | **GLM**    | `σ(W·x + b)` with numpy on extracted weights | numpy only (no sklearn) |
 | **Native** | The training library's predict API | sklearn / xgboost / torch |
 | **Scripted** | Python script: native predict + cold-start blend + diversity penalty + clip | same as Native + extras |
@@ -94,7 +94,7 @@ backend/                          FastAPI + Pydantic v2 + uvicorn
 │   ├── data/synthetic.py         deterministic data generator
 │   └── metrics/{serving,radar}.py per-combo latency accumulator + radar axes
 ├── scripts/                      generate_data.py, train_all.py, populate_lookup.py
-└── artifacts/                    gitignored — models, parquets, model_quality.json
+└── artifacts/                    gitignored — models, parquets, model_quality.json, lookup/*.npy
 frontend/                         Vite + React + TS + Tailwind + shadcn/ui + Recharts
 └── src/
     ├── App.tsx                   header + 4 tabs + Reset Metrics + ThemeToggle
@@ -134,15 +134,19 @@ This is a teaching demo, not a production replica of Booking's RS. Three
 deliberate simplifications are worth calling out so the audience understands
 where the demo diverges from the paper:
 
-1. **GLM is served in-process.** GLM serving in this demo runs as a numpy
-   inner product directly inside the FastAPI worker (~2.5 µs per predict).
-   In Booking's real RS — and in any production deployment of a GLM —
-   the model would be served by a dedicated process behind the same
-   network layer as Lookup. With both methods paying network cost, Lookup's
-   latency advantage (the strength the paper highlights for it) reappears.
-   In the demo, Lookup pays a TCP round-trip to Redis (~47 µs floor) while
-   GLM does not, which inverts the apparent ordering. The Tab 1 "Serving"
-   panel surfaces this asymmetry in a callout when Lookup or GLM is selected.
+1. **GLM and Lookup both run in-process.** GLM serving is a numpy inner
+   product directly inside the FastAPI worker (~2.5 µs per predict). Lookup
+   reads from a process-local numpy array (`artifacts/lookup/{model}.npy`)
+   loaded lazily on the first request — `table[user_id, hotel_id]`, ~50–
+   200 ns per predict. In Booking's real RS — and in any production
+   deployment of these methods — both would be served by dedicated
+   processes behind the same network layer (Cassandra for Lookup, an
+   in-house weight server for GLM). We collapsed both to in-process to
+   keep the stack to a single container and to make the latency story
+   crisp: with the network hop gone, Lookup is the fastest method and GLM
+   is a very close second, restoring the paper's ordering. The Tab 1
+   "Serving" panel surfaces this in a callout when Lookup or GLM is
+   selected.
 
 2. **Lookup table covers a subset of the input space.** `populate_lookup.py`
    precomputes 1000 users × 500 hotels = 500k entries per model (2M total
@@ -150,11 +154,15 @@ where the demo diverges from the paper:
    out so the demo can showcase **lookup misses**. In production at Booking
    scale the lookup would cover the full user × accommodation catalog.
 
-3. **Single Redis instance, no replication.** The `docker-compose.yml`
-   provisions one `redis:7-alpine` container with a local volume. There is
-   no replication, no Redis Cluster, no failover. The paper's "Lookup
-   Tables" method assumes a horizontally-scaled key-value store (Cassandra
-   in Booking's case); we simplify to make `docker compose up` instant.
+3. **No external storage layer for predictions.** The Lookup table is a
+   process-local `.npy` file, not a key-value store. The paper's "Lookup
+   Tables" method assumes an external, horizontally-scaled store
+   (Cassandra in Booking's case); collapsing to an in-process numpy array
+   trades the paper's scalability and persistence properties for a much
+   simpler stack and the tightest possible latency. The radar's static
+   axes still reflect what the paper says about Lookup conceptually
+   (high Modeling flexibility, low Input Space flexibility, high Stack
+   flexibility, etc.) — only the deployment shape is simplified.
 
 ---
 
@@ -169,7 +177,8 @@ The UI is built around this exact flow:
    doesn't change quality — only how we deliver predictions."
 
 2. **Tab 1 — Serving (~2 min)**
-   - Pick **LogReg + Lookup** → Predict. ~0.06 ms (Redis GET).
+   - Pick **LogReg + Lookup** → Predict. Sub-microsecond (numpy array
+     index — see "Demo simplifications" #1 for why this is so fast).
    - Switch to **GLM** (same input). Same probability (proves the weights
      were extracted correctly). Latency similar — paper §4 explicitly puts
      Lookup and GLM "at the origin" of the trade-off plane.
@@ -199,12 +208,15 @@ The UI is built around this exact flow:
 
 ## Troubleshooting
 
-- **"Lookup table not populated" yellow banner**: Redis was wiped or
-  `populate_lookup.py` was never run. Fix:
+- **"Lookup table not populated" yellow banner**: the `.npy` files under
+  `backend/artifacts/lookup/` are missing. Fix:
   ```bash
   docker compose exec backend python scripts/populate_lookup.py
   ```
-  ~4 s for all 4 models × 500k keys.
+  ~3–5 s for all 4 models × 500k entries each. The backend caches the
+  arrays lazily on first request; if you repopulate while the backend is
+  running, restart it (`docker compose restart backend`) to drop the
+  cache.
 
 - **Backend says "model_quality.json not found"**: training never ran.
   Run `generate_data.py` then `train_all.py` (in that order).
